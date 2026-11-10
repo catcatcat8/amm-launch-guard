@@ -61,7 +61,7 @@ abstract contract UniswapV2Fixture is Test {
     }
 
     function _deployFixture(string memory name, bytes memory args) private returns (address deployed) {
-        string memory hexCode = vm.trim(vm.readFile(string.concat("test/fixtures/", name, ".hex")));
+        string memory hexCode = vm.trim(vm.readFile(string.concat("test/fixtures/v2/", name, ".hex")));
         bytes memory initCode = abi.encodePacked(vm.parseBytes(hexCode), args);
         assembly {
             deployed := create(0, add(initCode, 0x20), mload(initCode))

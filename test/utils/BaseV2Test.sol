@@ -5,7 +5,7 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import {ITestFactory, ITestPair, ITestRouter, UniswapV2Fixture} from "./UniswapV2.sol";
 
 /// @notice Common setup: a new token (NEW), a quote token (WBNB), Uniswap V2, the team and an attacker.
-abstract contract BaseTest is UniswapV2Fixture {
+abstract contract BaseV2Test is UniswapV2Fixture {
     /// @dev The team wants to launch NEW at 1 NEW = 0.37 WBNB.
     uint256 internal constant AMOUNT_NEW = 1_000e18;
     uint256 internal constant AMOUNT_WBNB = 370e18;

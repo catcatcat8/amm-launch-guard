@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 
-/// @title AntiSync
+/// @title LaunchGuardV2
 /// @author Evgeniy Lebedev
 /// @notice Adds the first liquidity to a Uniswap V2 pair at an exact price, even if someone has already sent tokens
 ///         to the pair and called `sync()`.
@@ -24,7 +24,7 @@ import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 ///
 ///      The contract holds no funds and has no owner. Tokens move from `msg.sender` to the pair in one transaction.
 ///      It works with any Uniswap V2 fork that keeps the original `mint()` logic (PancakeSwap, SushiSwap, ...).
-contract AntiSync {
+contract LaunchGuardV2 {
     using SafeERC20 for IERC20;
 
     /// @notice Parameters of `addInitialLiquidity`.

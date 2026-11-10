@@ -9,7 +9,7 @@ Adds the first liquidity to a Uniswap V2 / PancakeSwap pair at an exact price, e
 
 Anyone can create a Uniswap V2 pair for a token that has not launched yet. An attacker creates the pair, sends a few wei of WBNB to it and calls `sync()`. After that, every `router.addLiquidity` call for this pair reverts, and the team cannot launch the token.
 
-`AntiSync` launches the pair anyway. It skips the router, sends the tokens straight to the pair and calls `pair.mint()`. It also adds a small extra amount to balance the attacker's tokens, so the launch price is exactly the one the team wanted. The attacker's tokens end up in the team's liquidity.
+`LaunchGuardV2` launches the pair anyway. It skips the router, sends the tokens straight to the pair and calls `pair.mint()`. It also adds a small extra amount to balance the attacker's tokens, so the launch price is exactly the one the team wanted. The attacker's tokens end up in the team's liquidity.
 
 ## The attack
 
@@ -21,26 +21,26 @@ A Uniswap V2 pair keeps two reserves. The price is their ratio. `sync()` is a pu
 
 The attack costs 2 wei plus gas and works again for every new token.
 
-Two obvious fixes do not work. Both are reproduced in [`test/Attack.t.sol`](test/Attack.t.sol):
+Two obvious fixes do not work. Both are reproduced in [`test/v2/AttackV2.t.sol`](test/v2/AttackV2.t.sol):
 
 - **Top up the dust and then call the router.** The team wants 1 NEW = 0.37 WBNB. To match 2 wei of WBNB it would need 5.4 wei of NEW, but only whole wei are possible. With 6 wei the dust ratio is 3:1 instead of 2.7:1. The router then fits the *whole* deposit to the dust ratio and launches the token at 0.333 WBNB instead of 0.37, about 10% lower.
 - **Fix the dust in one transaction and add liquidity in the next.** Between the two transactions the pool holds only dust. A swap of 1000 wei moves its price anywhere, and `addLiquidity` either reverts on slippage limits or adds liquidity at the attacker's price.
 
-## How AntiSync works
+## How LaunchGuardV2 works
 
 ```mermaid
 flowchart TD
     A["Attacker: createPair, send 2 wei WBNB, sync()"] --> B["Pair reserves: 0 NEW / 2 wei WBNB"]
     B --> C["router.addLiquidity"]
     C --> D["Reverts: INSUFFICIENT_LIQUIDITY"]
-    B --> E["AntiSync.addInitialLiquidity"]
+    B --> E["LaunchGuardV2.addInitialLiquidity"]
     E --> F["Read pair balances, compute extra NEW: ceil(2 × 1000 / 370) = 6 wei"]
     F --> G["Transfer 1000 NEW + 6 wei and 370 WBNB from the caller to the pair"]
     G --> H["pair.mint(to)"]
     H --> I["Pair: 1000 NEW + 6 wei / 370 WBNB + 2 wei, price 0.37"]
 ```
 
-While a pair has no liquidity providers (`totalSupply() == 0`), `pair.mint()` accepts tokens in any ratio. Only the router checks the ratio. `AntiSync.addInitialLiquidity` does the following in one transaction:
+While a pair has no liquidity providers (`totalSupply() == 0`), `pair.mint()` accepts tokens in any ratio. Only the router checks the ratio. `LaunchGuardV2.addInitialLiquidity` does the following in one transaction:
 
 1. Creates the pair if it does not exist.
 2. Reverts if the pair already has liquidity providers. Extra tokens would be shared with them.
@@ -51,7 +51,7 @@ While a pair has no liquidity providers (`totalSupply() == 0`), `pair.mint()` ac
 
 Every token in the pair belongs to the LP tokens minted to `to`, including the attacker's dust. The only exception is the `MINIMUM_LIQUIDITY` of 1000 wei, which every V2 pair locks on the first mint. The test `test_FrontRunDonationGoesToTheTeam` burns the LP tokens and gets back the deposit plus the attacker's WBNB.
 
-`AntiSync` has no owner and no storage. Tokens never stay in it, so it gives no approvals to the router and has no leftovers to return. One deployment per chain is enough.
+`LaunchGuardV2` has no owner and no storage. Tokens never stay in it, so it gives no approvals to the router and has no leftovers to return. One deployment per chain is enough.
 
 ## Usage
 
@@ -78,7 +78,7 @@ Launch sequence:
 
 1. Call `quoteExtra` to see how much would be added right now. For dust it is a few wei.
 2. Choose `maxExtraA` / `maxExtraB` with a margin. They are the front-running protection. If someone sends more tokens to the pair before your transaction and the extra amount goes above the limit, the call reverts with `ExtraAboveMax`. The tokens they sent stay in the pair and become yours on the next call.
-3. Approve `AntiSync` for `amountA + maxExtraA` of `tokenA` and `amountB + maxExtraB` of `tokenB`.
+3. Approve `LaunchGuardV2` for `amountA + maxExtraA` of `tokenA` and `amountB + maxExtraB` of `tokenB`.
 4. Call `addInitialLiquidity`. After the launch, reset the unused part of the approvals.
 
 Errors: `Expired`, `ZeroAmount`, `ZeroAddress` (`to`), `PairHasLiquidity`, `ExtraAboveMax(extraA, extraB)`. Event: `InitialLiquidityAdded(pair, sender, to, depositA, depositB, liquidity)`.
@@ -89,7 +89,7 @@ Errors: `Expired`, `ZeroAmount`, `ZeroAddress` (`to`), `PairHasLiquidity`, `Extr
 - **`maxExtra` bounds the cost of front-running.** Inside the limits a front-run donation does not change the price and becomes part of your liquidity. Above the limits the call reverts.
 - **Rounding.** The side that receives extra tokens ends at most 1 wei above the exact target ratio. The fuzz test `testFuzz_FinalPriceMatchesTarget` checks this for random prices and random synced or unsynced donations.
 - **Fee-on-transfer and rebasing tokens are not supported.** The pair would receive less than the computed amount, and the price would be off.
-- **Tokens with transfer restrictions** must allow a transfer from the caller to the pair, made by `AntiSync` as the spender.
+- **Tokens with transfer restrictions** must allow a transfer from the caller to the pair, made by `LaunchGuardV2` as the spender.
 - **V2 forks.** The contract relies on the original `mint()` logic. It is tested with the original Uniswap V2 bytecode (local tests) and with PancakeSwap V2 on BNB Smart Chain (fork tests). Forks with a modified `mint()` are not covered.
 - **Uniswap V3 is out of scope.** It has a different attack: a pool initialized at a wrong `sqrtPriceX96`.
 - The contract has not been audited.
@@ -108,11 +108,11 @@ forge test
 Example output:
 
 ```text
-Ran 1 test for test/fork/AntiSyncFork.t.sol:AntiSyncForkTest
+Ran 1 test for test/fork/LaunchGuardV2Fork.t.sol:LaunchGuardV2ForkTest
 [SKIP: skipped: BSC_RPC_URL is not set] setUp()
 Suite result: ok. 0 passed; 0 failed; 1 skipped
 
-Ran 5 tests for test/Attack.t.sol:AttackTest
+Ran 5 tests for test/v2/AttackV2.t.sol:AttackTest
 [PASS] test_AttackBreaksNormalLaunch()
 [PASS] test_DustOnBothSidesForcesAttackerPrice()
 [PASS] test_FixInSeparateTransactionIsGriefedAgain()
@@ -120,9 +120,9 @@ Ran 5 tests for test/Attack.t.sol:AttackTest
 [PASS] test_RouterCopiesRoundedDustRatio()
 Suite result: ok. 5 passed; 0 failed; 0 skipped
 
-Ran 14 tests for test/AntiSync.t.sol:AntiSyncTest
+Ran 14 tests for test/v2/LaunchGuardV2.t.sol:LaunchGuardV2Test
 [PASS] testFuzz_FinalPriceMatchesTarget(uint256,uint256,uint256,uint256,bool) (runs: 256)
-[PASS] test_AntiSyncRestoresTargetPrice()
+[PASS] test_GuardRestoresTargetPrice()
 [PASS] test_CountsTokensSentWithoutSync()
 [PASS] test_CreatesPairIfMissing()
 [PASS] test_DustOnBothSides()
@@ -138,7 +138,7 @@ Ran 14 tests for test/AntiSync.t.sol:AntiSyncTest
 Suite result: ok. 14 passed; 0 failed; 0 skipped
 ```
 
-Coverage of `src/AntiSync.sol` (`forge coverage`): 100% lines, statements, branches and functions.
+Coverage of `src/LaunchGuardV2.sol` (`forge coverage`): 100% lines, statements, branches and functions.
 
 **Fork tests** run the attack and the fix against the real PancakeSwap V2 contracts on BNB Smart Chain. Without `BSC_RPC_URL` they are skipped, which is why CI passes without secrets.
 
@@ -159,12 +159,12 @@ forge script script/Deploy.s.sol --rpc-url <RPC_URL> --account deployer --broadc
 
 ```text
 ├── src
-│   ├── AntiSync.sol                 # the contract
+│   ├── LaunchGuardV2.sol               # the contract
 │   └── interfaces                   # minimal IUniswapV2Factory / IUniswapV2Pair
 ├── test
-│   ├── Attack.t.sol                 # the attack and why router-based fixes fail
-│   ├── AntiSync.t.sol               # unit, edge-case and fuzz tests
-│   ├── fork/AntiSyncFork.t.sol      # PancakeSwap V2 on BNB Smart Chain
+│   ├── v2/AttackV2.t.sol             # the attack and why router-based fixes fail
+│   ├── v2/LaunchGuardV2.t.sol        # unit, edge-case and fuzz tests
+│   ├── fork/LaunchGuardV2Fork.t.sol  # PancakeSwap V2 on BNB Smart Chain
 │   ├── fixtures                     # original Uniswap V2 factory and router bytecode
 │   ├── mocks                        # MockERC20
 │   └── utils                        # test setup and Uniswap V2 helpers

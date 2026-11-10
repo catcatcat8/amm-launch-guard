@@ -3,17 +3,17 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {AntiSync} from "../src/AntiSync.sol";
+import {LaunchGuardV2} from "../src/LaunchGuardV2.sol";
 
-/// @notice Deploys AntiSync. The contract has no owner and no constructor arguments, so one deployment per chain is
+/// @notice Deploys LaunchGuardV2. The contract has no owner and no constructor arguments, so one deployment per chain is
 ///         enough for any number of launches.
 /// @dev forge script script/Deploy.s.sol --rpc-url <RPC_URL> --account <KEYSTORE_ACCOUNT> --broadcast
 contract Deploy is Script {
-    function run() external returns (AntiSync antiSync) {
+    function run() external returns (LaunchGuardV2 guard) {
         vm.startBroadcast();
-        antiSync = new AntiSync();
+        guard = new LaunchGuardV2();
         vm.stopBroadcast();
 
-        console.log("AntiSync deployed at", address(antiSync));
+        console.log("LaunchGuardV2 deployed at", address(guard));
     }
 }
