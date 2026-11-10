@@ -138,14 +138,18 @@ struct Params {
 
 function addInitialLiquidity(Params calldata params)
     external returns (address pool, uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1);
+
+// Call with eth_call. Positive: the caller pays; negative: the caller receives.
+function quoteRestorePrice(IUniswapV3Pool pool, uint160 sqrtPriceX96)
+    external returns (int256 amount0, int256 amount1);
 ```
 
 1. Sort the tokens and compute `sqrtPriceX96 = sqrt(amount1 / amount0) × 2^96`. For a full-range launch use the widest ticks for the fee tier, for example ±887220 for tick spacing 60 (Uniswap 0.3%) or ±887250 for tick spacing 50 (PancakeSwap 0.25%).
-2. Simulate the call (`eth_call`) to see whether moving the price costs anything. Set `maxSwapIn0` / `maxSwapIn1` with a margin.
+2. If the pool already exists, call `quoteRestorePrice` with `eth_call` to see what moving the price would cost. For an empty pool it returns zeros. Set `maxSwapIn0` / `maxSwapIn1` to the positive amount plus a margin.
 3. Approve the guard for `amount0Desired + maxSwapIn0` of `token0` and `amount1Desired + maxSwapIn1` of `token1`.
 4. Call `addInitialLiquidity`. After the launch, reset the unused part of the approvals.
 
-Errors: `Expired`, `ZeroAddress`, `UnsortedTokens`, `SwapInAboveMax`, `PriceNotRestored`, `UnexpectedCallback`. Events: `PriceRestored`, `InitialPositionMinted`.
+Errors: `Expired`, `ZeroAddress`, `UnsortedTokens`, `SwapInAboveMax`, `PriceNotRestored`, `UnexpectedCallback`, `QuoteFailed`. Events: `PriceRestored`, `InitialPositionMinted`.
 
 ## Security considerations and limitations
 
@@ -167,6 +171,7 @@ Both contracts:
 
 - **The price is exact.** The swap uses the target as the price limit, and the fuzz test `testFuzz_RestoresAnyAttackerPrice` checks this for random attacker prices across the whole valid range.
 - **The pool does not have to be empty.** Attacker liquidity is crossed at prices better than the target, within `maxSwapIn*`.
+- **Griefing with liquidity.** An attacker who sees the transaction in the public mempool can add liquidity just before it, so that moving the price costs more than `maxSwapIn*`, and the call reverts. Unlike the V2 donation, this liquidity can be withdrawn afterwards, so each attempt costs the attacker only gas. Higher limits turn the attempt into a loss for the attacker, because the guard buys that liquidity at prices better than the target. Sending the transaction through a private RPC removes the window.
 - **The swap callback trusts only the pool of the current call.** The payer is kept in transient storage and is always the caller. Re-entering `addInitialLiquidity` is blocked.
 - **Gas.** The swap gas grows with the distance between the attacker's price and the target, and it is higher for fee tiers with a small tick spacing.
 - **The target chain must support Cancun** (transient storage). Ethereum and BNB Smart Chain do.
@@ -200,7 +205,7 @@ Ran 3 tests for test/v3/AttackV3.t.sol:AttackV3Test
 [PASS] test_NormalLaunchWithoutAttack()
 Suite result: ok. 3 passed; 0 failed; 0 skipped
 
-Ran 6 test suites: 38 tests passed, 0 failed, 2 skipped (40 total tests)
+Ran 6 test suites: 44 tests passed, 0 failed, 2 skipped (46 total tests)
 ```
 
 The two skipped suites are the fork tests. Coverage (`forge coverage`): 100% lines, statements, branches and functions for both `src/LaunchGuardV2.sol` and `src/LaunchGuardV3.sol`.

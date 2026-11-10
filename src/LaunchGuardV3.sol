@@ -8,45 +8,49 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
 
-/// @title LaunchGuardV3
-/// @author Evgeniy Lebedev
-/// @notice Creates the first liquidity position in a Uniswap V3 pool at an exact price, even if someone has already
-///         created the pool and initialized it at a wrong price.
-/// @dev The attack: anyone can create a V3 pool and call `initialize(sqrtPriceX96)` once. An attacker initializes
-///      the pool of a token that has not launched yet at an absurd price. `createAndInitializePoolIfNecessary` then
-///      skips the initialization, and the team's position is created at the attacker's price.
-///
-///      The fix: while a pool has no liquidity, a swap moves its price to `sqrtPriceLimitX96` and costs nothing,
-///      because there is nothing to trade against. The contract swaps the pool back to the target price and mints the
-///      position in the same transaction, so nobody can move the price in between.
-///
-///      If the attacker added liquidity, the swap trades against it. These trades happen at prices between the
-///      attacker's price and the target, that is, at prices better than the target for the caller, but they need
-///      tokens. `maxSwapIn0` / `maxSwapIn1` cap the amounts the caller agrees to spend. The tokens received from the
-///      swap go to the caller.
-///
-///      The contract has no owner and keeps no tokens between calls. While it holds the caller's tokens during the
-///      mint, re-entering `addInitialLiquidity` is blocked. It works with Uniswap V3 and PancakeSwap V3.
+/**
+ * @title LaunchGuardV3
+ * @author Evgeniy Lebedev
+ * @notice Creates the first liquidity position in a Uniswap V3 pool at an exact price, even if someone has already
+ *         created the pool and initialized it at a wrong price.
+ * @dev The attack: anyone can create a V3 pool and call `initialize(sqrtPriceX96)` once. An attacker initializes
+ *      the pool of a token that has not launched yet at an absurd price. `createAndInitializePoolIfNecessary` then
+ *      skips the initialization, and the team's position is created at the attacker's price.
+ *
+ *      The fix: while a pool has no liquidity, a swap moves its price to `sqrtPriceLimitX96` and costs nothing,
+ *      because there is nothing to trade against. The contract swaps the pool back to the target price and mints the
+ *      position in the same transaction, so nobody can move the price in between.
+ *
+ *      If the attacker added liquidity, the swap trades against it. These trades happen at prices between the
+ *      attacker's price and the target, that is, at prices better than the target for the caller, but they need
+ *      tokens. `maxSwapIn0` / `maxSwapIn1` cap the amounts the caller agrees to spend. The tokens received from the
+ *      swap go to the caller.
+ *
+ *      The contract has no owner and keeps no tokens between calls. While it holds the caller's tokens during the
+ *      mint, re-entering `addInitialLiquidity` is blocked. It works with Uniswap V3 and PancakeSwap V3.
+ */
 contract LaunchGuardV3 is ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
-    /// @notice Parameters of `addInitialLiquidity`. The token, fee and tick fields follow
-    ///         `INonfungiblePositionManager.MintParams`.
-    /// @param positionManager Uniswap V3 (or PancakeSwap V3) NonfungiblePositionManager.
-    /// @param token0 The token with the lower address.
-    /// @param token1 The token with the higher address.
-    /// @param fee Pool fee tier, for example 3000 for 0.3%.
-    /// @param sqrtPriceX96 Target price: sqrt(token1 / token0) as a Q64.96 number.
-    /// @param tickLower Lower tick of the position.
-    /// @param tickUpper Upper tick of the position.
-    /// @param amount0Desired Amount of `token0` to deposit at most.
-    /// @param amount1Desired Amount of `token1` to deposit at most.
-    /// @param amount0Min Minimum amount of `token0` the position must take.
-    /// @param amount1Min Minimum amount of `token1` the position must take.
-    /// @param maxSwapIn0 Maximum amount of `token0` the caller agrees to spend to move the price down to the target.
-    /// @param maxSwapIn1 Maximum amount of `token1` the caller agrees to spend to move the price up to the target.
-    /// @param recipient Receiver of the position NFT.
-    /// @param deadline The transaction reverts after this timestamp.
+    /**
+     * @notice Parameters of `addInitialLiquidity`. The token, fee and tick fields follow
+     *         `INonfungiblePositionManager.MintParams`.
+     * @param positionManager Uniswap V3 (or PancakeSwap V3) NonfungiblePositionManager.
+     * @param token0 The token with the lower address.
+     * @param token1 The token with the higher address.
+     * @param fee Pool fee tier, for example 3000 for 0.3%.
+     * @param sqrtPriceX96 Target price: sqrt(token1 / token0) as a Q64.96 number.
+     * @param tickLower Lower tick of the position.
+     * @param tickUpper Upper tick of the position.
+     * @param amount0Desired Amount of `token0` to deposit at most.
+     * @param amount1Desired Amount of `token1` to deposit at most.
+     * @param amount0Min Minimum amount of `token0` the position must take.
+     * @param amount1Min Minimum amount of `token1` the position must take.
+     * @param maxSwapIn0 Maximum amount of `token0` the caller agrees to spend to move the price down to the target.
+     * @param maxSwapIn1 Maximum amount of `token1` the caller agrees to spend to move the price up to the target.
+     * @param recipient Receiver of the position NFT.
+     * @param deadline The transaction reverts after this timestamp.
+     */
     struct Params {
         INonfungiblePositionManager positionManager;
         address token0;
@@ -65,24 +69,10 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         uint256 deadline;
     }
 
-    /// @notice Emitted when the pool price was not at the target and the contract swapped it back.
-    /// @param pool The pool.
-    /// @param fromSqrtPriceX96 The price before the swap.
-    /// @param toSqrtPriceX96 The price after the swap (the target).
-    /// @param amount0 Amount of `token0` paid (positive) or received (negative) by the caller.
-    /// @param amount1 Amount of `token1` paid (positive) or received (negative) by the caller.
     event PriceRestored(
         address indexed pool, uint160 fromSqrtPriceX96, uint160 toSqrtPriceX96, int256 amount0, int256 amount1
     );
 
-    /// @notice Emitted when the position is minted.
-    /// @param pool The pool.
-    /// @param sender The account that paid for the position.
-    /// @param recipient Receiver of the position NFT.
-    /// @param tokenId The position NFT id.
-    /// @param liquidity Liquidity of the position.
-    /// @param amount0 Amount of `token0` deposited.
-    /// @param amount1 Amount of `token1` deposited.
     event InitialPositionMinted(
         address indexed pool,
         address indexed sender,
@@ -93,36 +83,48 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         uint256 amount1
     );
 
-    /// @notice `block.timestamp` is after `deadline`.
     error Expired();
-    /// @notice `recipient` is the zero address.
     error ZeroAddress();
-    /// @notice `token0` is not lower than `token1`.
     error UnsortedTokens();
-    /// @notice The swap callback was not called by the pool this contract is swapping in.
     error UnexpectedCallback();
-    /// @notice Moving the price needs more tokens than `maxSwapIn0` / `maxSwapIn1` allow.
     error SwapInAboveMax(uint256 amountIn, uint256 maxAmountIn);
-    /// @notice The swap did not bring the pool to the target price.
     error PriceNotRestored(uint160 sqrtPriceX96);
+    error QuoteFailed();
+    /**
+     * @dev Carries the swap amounts out of the callback in `quoteRestorePrice`. Never reaches the caller.
+     */
+    error QuoteResult(int256 amount0, int256 amount1);
 
-    /// @dev The pool this contract is swapping in, set only for the duration of the swap.
+    /**
+     * @dev The pool this contract is swapping in, set only for the duration of the swap.
+     */
     address private transient _swapPool;
-    /// @dev The account that pays for the swap. It is stored here and not passed through the callback data, so a fake
-    ///      pool returned by a fake position manager cannot make the contract pull tokens from another account.
+    /**
+     * @dev The account that pays for the swap. It is stored here and not passed through the callback data, so a fake
+     *      pool returned by a fake position manager cannot make the contract pull tokens from another account.
+     */
     address private transient _swapPayer;
+    /**
+     * @dev True while `quoteRestorePrice` runs: the callback reverts with the amounts instead of paying.
+     */
+    bool private transient _quoting;
 
-    /// @notice Creates and initializes the pool if needed, moves its price to `sqrtPriceX96` if someone has changed
-    ///         it, and mints a position.
-    /// @dev The caller must approve this contract for `amount0Desired + maxSwapIn0` of `token0` and
-    ///      `amount1Desired + maxSwapIn1` of `token1`. Unused tokens are returned to the caller.
-    ///      Fee-on-transfer and rebasing tokens are not supported.
-    /// @param params See `Params`.
-    /// @return pool The pool address.
-    /// @return tokenId The position NFT id.
-    /// @return liquidity Liquidity of the position.
-    /// @return amount0 Amount of `token0` deposited into the position.
-    /// @return amount1 Amount of `token1` deposited into the position.
+    /**
+     * @notice Creates and initializes the pool if needed, moves its price to `sqrtPriceX96` if someone has changed
+     *         it, and mints a position.
+     * @dev The caller must approve this contract for `amount0Desired + maxSwapIn0` of `token0` and
+     *      `amount1Desired + maxSwapIn1` of `token1`. Unused tokens are returned to the caller.
+     *      Fee-on-transfer and rebasing tokens are not supported.
+     *
+     *      If it had to move the price, emits `PriceRestored` with the amounts the caller paid (positive) and received
+     *      (negative). Then emits `InitialPositionMinted`.
+     * @param params See `Params`.
+     * @return pool The pool address.
+     * @return tokenId The position NFT id.
+     * @return liquidity Liquidity of the position.
+     * @return amount0 Amount of `token0` deposited into the position.
+     * @return amount1 Amount of `token1` deposited into the position.
+     */
     function addInitialLiquidity(Params calldata params)
         external
         nonReentrant
@@ -140,18 +142,63 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         emit InitialPositionMinted(pool, msg.sender, params.recipient, tokenId, liquidity, amount0, amount1);
     }
 
-    /// @notice Uniswap V3 swap callback. Pays the pool for the price-restoring swap.
+    /**
+     * @notice Returns how many tokens `addInitialLiquidity` would pay (positive) or receive (negative) to move the
+     *         price of `pool` to `sqrtPriceX96` right now.
+     * @dev Not a view function: like Uniswap's QuoterV2, it runs the swap and reverts it inside the callback. Call it
+     *      with `eth_call` (`cast call`, `staticCall` in ethers). Returns zeros if the pool is not initialized or is
+     *      already at the target price. Use the positive amount, with a margin, as `maxSwapIn0` / `maxSwapIn1`.
+     * @param pool The pool, for example from `factory.getPool(token0, token1, fee)`.
+     * @param sqrtPriceX96 The target price.
+     * @return amount0 Amount of `token0` paid (positive) or received (negative).
+     * @return amount1 Amount of `token1` paid (positive) or received (negative).
+     */
+    function quoteRestorePrice(IUniswapV3Pool pool, uint160 sqrtPriceX96)
+        external
+        nonReentrant
+        returns (int256 amount0, int256 amount1)
+    {
+        (uint160 current,) = pool.slot0();
+        if (current == 0 || current == sqrtPriceX96) return (0, 0);
+
+        _swapPool = address(pool);
+        _quoting = true;
+        try pool.swap(address(this), sqrtPriceX96 < current, type(int128).max, sqrtPriceX96, "") {
+            // A real pool always calls the callback, and the callback always reverts here.
+            revert QuoteFailed();
+        } catch (bytes memory reason) {
+            if (reason.length != 68 || bytes4(reason) != QuoteResult.selector) {
+                assembly {
+                    revert(add(reason, 32), mload(reason))
+                }
+            }
+            assembly {
+                amount0 := mload(add(reason, 36))
+                amount1 := mload(add(reason, 68))
+            }
+        }
+        _swapPool = address(0);
+        _quoting = false;
+    }
+
+    /**
+     * @notice Uniswap V3 swap callback. Pays the pool for the price-restoring swap.
+     */
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
         _paySwap(amount0Delta, amount1Delta, data);
     }
 
-    /// @notice PancakeSwap V3 swap callback. Same as `uniswapV3SwapCallback`.
+    /**
+     * @notice PancakeSwap V3 swap callback. Same as `uniswapV3SwapCallback`.
+     */
     function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
         _paySwap(amount0Delta, amount1Delta, data);
     }
 
-    /// @dev Swaps the pool to the target price if it is somewhere else. The swap is exact-input with a huge amount and
-    ///      the target as the price limit, so it stops exactly at the target. The cost is checked in the callback.
+    /**
+     * @dev Swaps the pool to the target price if it is somewhere else. The swap is exact-input with a huge amount and
+     *      the target as the price limit, so it stops exactly at the target. The cost is checked in the callback.
+     */
     function _restorePrice(address pool, Params calldata params) private {
         (uint160 current,) = IUniswapV3Pool(pool).slot0();
         if (current == params.sqrtPriceX96) return;
@@ -180,6 +227,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
 
     function _paySwap(int256 amount0Delta, int256 amount1Delta, bytes calldata data) private {
         if (msg.sender != _swapPool) revert UnexpectedCallback();
+        if (_quoting) revert QuoteResult(amount0Delta, amount1Delta);
         (address token0, address token1, uint256 maxSwapIn0, uint256 maxSwapIn1) =
             abi.decode(data, (address, address, uint256, uint256));
 
@@ -192,7 +240,9 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         IERC20(token).safeTransferFrom(_swapPayer, msg.sender, amount);
     }
 
-    /// @dev Pulls the desired amounts, mints the position through the position manager and returns what is left.
+    /**
+     * @dev Pulls the desired amounts, mints the position through the position manager and returns what is left.
+     */
     function _mint(Params calldata params)
         private
         returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)

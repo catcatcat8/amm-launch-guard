@@ -5,17 +5,22 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {LaunchGuardV3} from "../../src/LaunchGuardV3.sol";
 import {INonfungiblePositionManager} from "../../src/interfaces/INonfungiblePositionManager.sol";
+import {IUniswapV3Pool} from "../../src/interfaces/IUniswapV3Pool.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {ITestPositionManager, ITestV3Factory, ITestV3Pool} from "../utils/UniswapV3.sol";
 import {BscForkTest} from "./BscForkTest.sol";
 
-/// @notice The attack and the fix on the real PancakeSwap V3 deployment on BNB Smart Chain.
+/**
+ * @notice The attack and the fix on the real PancakeSwap V3 deployment on BNB Smart Chain.
+ */
 contract LaunchGuardV3ForkTest is BscForkTest {
     ITestPositionManager internal constant PANCAKE_POSITION_MANAGER =
         ITestPositionManager(0x46A15B0b27311cedF172AB29E4f4766fbE7F4364);
     ITestV3Factory internal constant PANCAKE_V3_FACTORY = ITestV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
 
-    /// @dev The 0.25% fee tier and its widest range (tick spacing 50).
+    /**
+     * @dev The 0.25% fee tier and its widest range (tick spacing 50).
+     */
     uint24 internal constant FEE = 2500;
     int24 internal constant FULL_RANGE_LOWER = -887250;
     int24 internal constant FULL_RANGE_UPPER = 887250;
@@ -23,7 +28,9 @@ contract LaunchGuardV3ForkTest is BscForkTest {
     uint256 internal constant AMOUNT_NEW = 1_000_000e18;
     uint256 internal constant AMOUNT_WBNB = 37e18; // 1 NEW = 0.000037 WBNB
 
-    /// @dev A wrong price set by the attacker: 1 token0 = 1,000,000 token1.
+    /**
+     * @dev A wrong price set by the attacker: 1 token0 = 1,000,000 token1.
+     */
     uint160 internal constant ATTACKER_PRICE = uint160(1000 << 96);
 
     LaunchGuardV3 internal guard;
@@ -67,6 +74,11 @@ contract LaunchGuardV3ForkTest is BscForkTest {
     }
 
     function test_Fork_GuardLaunchesAtTargetPrice() public {
+        // The pool has no liquidity, so moving the price back costs nothing.
+        (int256 quote0, int256 quote1) = guard.quoteRestorePrice(IUniswapV3Pool(pool), targetPrice);
+        assertEq(quote0, 0);
+        assertEq(quote1, 0);
+
         vm.startPrank(team);
         newToken.approve(address(guard), type(uint256).max);
         WBNB.approve(address(guard), type(uint256).max);
