@@ -29,7 +29,7 @@ A Uniswap V2 pair keeps two reserves, and the price is their ratio. `sync()` is 
 The attack costs 2 wei plus gas. Two obvious fixes do not work. Both are reproduced in [`test/v2/AttackV2.t.sol`](test/v2/AttackV2.t.sol):
 
 - **Top up the dust and then call the router.** To match 2 wei of WBNB at 0.37 the team would need 5.4 wei of NEW, but only whole wei are possible. With 6 wei the dust ratio is 3:1 instead of 2.7:1. The router then fits the *whole* deposit to the dust ratio and launches the token at 0.333 WBNB, about 10% lower.
-- **Fix the dust in one transaction and add liquidity in the next.** Between the two transactions the pool holds only dust. A swap of 1000 wei moves its price anywhere, and `addLiquidity` either reverts on slippage limits or adds liquidity at the attacker's price.
+- **Fix the dust in one transaction and add liquidity in the next.** Between the two transactions the pool holds only dust. In the test, a swap of 1000 wei of WBNB moves its price about 3000 times, and `addLiquidity` either reverts on slippage limits or adds liquidity at the attacker's price.
 
 ### How LaunchGuardV2 works
 
@@ -81,6 +81,8 @@ function quoteExtra(IUniswapV2Factory factory, address tokenA, address tokenB, u
 2. Choose `maxExtraA` / `maxExtraB` with a margin. They are the front-running protection. If someone sends more tokens to the pair before your transaction and the extra amount goes above the limit, the call reverts with `ExtraAboveMax`. The tokens they sent stay in the pair and become yours on the next call.
 3. Approve the guard for `amountA + maxExtraA` of `tokenA` and `amountB + maxExtraB` of `tokenB`.
 4. Call `addInitialLiquidity`. After the launch, reset the unused part of the approvals.
+
+Errors: `Expired`, `ZeroAmount`, `ZeroAddress`, `PairHasLiquidity`, `ExtraAboveMax`. Event: `InitialLiquidityAdded`.
 
 ## Uniswap V3: the initialization attack
 
@@ -239,7 +241,7 @@ forge script script/Deploy.s.sol --rpc-url <RPC_URL> --account deployer --broadc
 
 ## Context
 
-A pet project: my own tool for token launches. The first version, `AntiSync`, was a Hardhat project for Uniswap V2 that topped up the dust, called `sync()` and then added liquidity through the router. While moving it to Foundry I found that the router-based approach can launch at a price that is off by about 10%, because the router copies the rounded dust ratio. I replaced it with a direct `mint()`, then added the Uniswap V3 version and tests that reproduce both attacks.
+A personal project: a tool I wrote for my own token launches, kept here as a tested reference for both launch attacks and their fixes.
 
 ## License
 
