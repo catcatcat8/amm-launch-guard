@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @notice Minimal Uniswap V2 pair interface. Works with any V2 fork (PancakeSwap, SushiSwap, ...).
+/// @notice Uniswap V2 pair functions used by AntiSync. Any V2 fork (PancakeSwap, SushiSwap, ...) has them.
 interface IUniswapV2Pair {
-    function sync() external;
+    function totalSupply() external view returns (uint256);
 
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
+    function mint(address to) external returns (uint256 liquidity);
 }

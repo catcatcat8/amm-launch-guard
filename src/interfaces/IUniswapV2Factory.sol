@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @notice Minimal Uniswap V2 factory interface. Works with any V2 fork (PancakeSwap, SushiSwap, ...).
+/// @notice Uniswap V2 factory functions used by AntiSync. Any V2 fork (PancakeSwap, SushiSwap, ...) has them.
 interface IUniswapV2Factory {
     function getPair(address tokenA, address tokenB) external view returns (address pair);
+
+    function createPair(address tokenA, address tokenB) external returns (address pair);
 }
