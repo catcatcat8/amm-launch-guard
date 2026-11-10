@@ -81,6 +81,7 @@ contract LaunchGuardV2 {
      * @return liquidity Amount of LP tokens minted to `params.to`.
      */
     function addInitialLiquidity(Params calldata params) external returns (address pair, uint256 liquidity) {
+        // forge-lint: disable-next-line(block-timestamp) - a deadline check; validators can shift it by seconds only.
         if (block.timestamp > params.deadline) revert Expired();
         if (params.amountA == 0 || params.amountB == 0) revert ZeroAmount();
         if (params.to == address(0)) revert ZeroAddress();
@@ -98,6 +99,8 @@ contract LaunchGuardV2 {
         IERC20(params.tokenB).safeTransferFrom(msg.sender, pair, depositB);
         liquidity = IUniswapV2Pair(pair).mint(params.to);
 
+        // The event reports the result of `mint`. The contract has no state that a reentrant call could corrupt.
+        // forge-lint: disable-next-line(reentrancy-events)
         emit InitialLiquidityAdded(pair, msg.sender, params.to, depositA, depositB, liquidity);
     }
 

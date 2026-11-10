@@ -130,6 +130,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         nonReentrant
         returns (address pool, uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
     {
+        // forge-lint: disable-next-line(block-timestamp) - a deadline check; validators can shift it by seconds only.
         if (block.timestamp > params.deadline) revert Expired();
         if (params.recipient == address(0)) revert ZeroAddress();
         if (params.token0 >= params.token1) revert UnsortedTokens();
@@ -139,6 +140,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         _restorePrice(pool, params);
         (tokenId, liquidity, amount0, amount1) = _mint(params);
 
+        // forge-lint: disable-next-line(reentrancy-events) - the function is nonReentrant.
         emit InitialPositionMinted(pool, msg.sender, params.recipient, tokenId, liquidity, amount0, amount1);
     }
 
@@ -158,7 +160,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         nonReentrant
         returns (int256 amount0, int256 amount1)
     {
-        (uint160 current,) = pool.slot0();
+        uint160 current = _sqrtPriceX96(address(pool));
         if (current == 0 || current == sqrtPriceX96) return (0, 0);
 
         _swapPool = address(pool);
@@ -201,7 +203,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
      *      the target as the price limit, so it stops exactly at the target. The cost is checked in the callback.
      */
     function _restorePrice(address pool, Params calldata params) private {
-        (uint160 current,) = IUniswapV3Pool(pool).slot0();
+        uint160 current = _sqrtPriceX96(pool);
         if (current == params.sqrtPriceX96) return;
 
         // token1 per token0 is too high: sell token0 to move the price down. Otherwise sell token1.
@@ -220,10 +222,17 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         _swapPool = address(0);
         _swapPayer = address(0);
 
-        (uint160 restored,) = IUniswapV3Pool(pool).slot0();
+        uint160 restored = _sqrtPriceX96(pool);
         if (restored != params.sqrtPriceX96) revert PriceNotRestored(restored);
 
+        // forge-lint: disable-next-line(reentrancy-events) - the caller is nonReentrant.
         emit PriceRestored(pool, current, restored, amount0, amount1);
+    }
+
+    function _sqrtPriceX96(address pool) private view returns (uint160 sqrtPriceX96) {
+        // Only the price is needed. `slot0` also returns the tick and other fields.
+        // forge-lint: disable-next-line(unused-return)
+        (sqrtPriceX96,) = IUniswapV3Pool(pool).slot0();
     }
 
     function _paySwap(int256 amount0Delta, int256 amount1Delta, bytes calldata data) private {
@@ -241,6 +250,8 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
 
     function _pay(address token, uint256 amount, uint256 maxAmount) private {
         if (amount > maxAmount) revert SwapInAboveMax(amount, maxAmount);
+        // `_swapPayer` is the `msg.sender` of the current `addInitialLiquidity` call, see its declaration.
+        // forge-lint: disable-next-line(arbitrary-send-erc20)
         IERC20(token).safeTransferFrom(_swapPayer, msg.sender, amount);
     }
 
