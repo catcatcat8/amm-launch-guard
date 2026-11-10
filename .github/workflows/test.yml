@@ -25,3 +25,7 @@ jobs:
 
       - name: Test
         run: forge test -vv
+
+      # Last: linting a subset of files rewrites the build cache.
+      - name: Lint
+        run: forge lint src script --deny notes
