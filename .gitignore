@@ -3,5 +3,9 @@ out/
 cache/
 broadcast/*/31337/
 
+# Coverage reports
+lcov.info
+coverage/
+
 # Environment
 .env
