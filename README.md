@@ -16,6 +16,10 @@ Anyone can create the pool of a token before the token launches. An attacker can
 
 Both contracts have no owner and keep no tokens between calls. One deployment per chain serves any number of launches. Each attack is reproduced in a test against the original Uniswap bytecode and on a BNB Smart Chain fork.
 
+## How common is it
+
+A scan of all 3,671,255 PancakeSwap V2 pairs (November 2026) found **11,991 pairs** with no LP tokens and exactly one non-zero reserve: the state the V2 attack leaves behind, in which `router.addLiquidity` always reverts. In 88% of them the filled side holds exactly 1 wei of WBNB or USDT. 462 of these pairs were blocked in the 30 days before the scan. Method, data and caveats: [`research/`](research/README.md).
+
 The examples below launch a new token NEW against WBNB at 1 NEW = 0.37 WBNB (1000 NEW + 370 WBNB).
 
 ## Uniswap V2: the `sync()` attack
@@ -240,6 +244,7 @@ forge script script/Deploy.s.sol --rpc-url <RPC_URL> --account deployer --broadc
 │   ├── fixtures                     # original Uniswap V2 / V3 bytecode
 │   ├── mocks                        # test tokens, a fake pool and position manager
 │   └── utils                        # test setup and Uniswap helpers
+├── research                         # scan of PancakeSwap V2 pairs blocked by the attack
 ├── script/Deploy.s.sol
 └── foundry.toml
 ```

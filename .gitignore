@@ -10,3 +10,6 @@ coverage/
 
 # Environment
 .env
+
+# Raw output of research/scan.py
+research/data/scan.jsonl
