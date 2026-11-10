@@ -5,7 +5,7 @@ import {BaseV2Test} from "../utils/BaseV2Test.sol";
 import {ITestPair} from "../utils/UniswapV2.sol";
 
 /// @notice Shows the attack on a plain Uniswap V2 launch and why fixing it through the router does not work.
-contract AttackTest is BaseV2Test {
+contract AttackV2Test is BaseV2Test {
     function setUp() public override {
         super.setUp();
         vm.startPrank(team);
