@@ -5,6 +5,7 @@ script = "script"
 out = "out"
 libs = ["lib"]
 solc_version = "0.8.28"
+evm_version = "cancun"
 remappings = [
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
