@@ -9,6 +9,8 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
 ]
+# The tests deploy the original Uniswap V2 bytecode from test/fixtures.
+fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 
 [fmt]
 line_length = 120
