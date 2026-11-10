@@ -174,7 +174,7 @@ forge script script/Deploy.s.sol --rpc-url <RPC_URL> --account deployer --broadc
 
 ## Context
 
-I wrote the first version in 2023 as my own tool for token launches on PancakeSwap. It was a Hardhat project that topped up the dust, called `sync()` and then added liquidity through the router. In 2026 I moved it to Foundry and found that the router-based approach can launch at a price that is off by about 10%, because the router copies the rounded dust ratio. I replaced it with a direct `mint()` and added tests that reproduce the attack locally and on a BNB Smart Chain fork.
+A pet project: my own tool for token launches on PancakeSwap. The first version was a Hardhat project that topped up the dust, called `sync()` and then added liquidity through the router. While moving it to Foundry I found that the router-based approach can launch at a price that is off by about 10%, because the router copies the rounded dust ratio. The current version mints directly and comes with tests that reproduce the attack locally and on a BNB Smart Chain fork.
 
 ## License
 
