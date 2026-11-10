@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @notice Uniswap V3 NonfungiblePositionManager functions used by LaunchGuardV3. PancakeSwap V3 has the same ones.
+/**
+ * @notice Uniswap V3 NonfungiblePositionManager functions used by LaunchGuardV3. PancakeSwap V3 has the same ones.
+ */
 interface INonfungiblePositionManager {
     struct MintParams {
         address token0;

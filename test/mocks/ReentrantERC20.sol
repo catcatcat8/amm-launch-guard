@@ -3,7 +3,9 @@ pragma solidity 0.8.28;
 
 import {MockERC20} from "./MockERC20.sol";
 
-/// @notice ERC20 that calls `target` with `data` on its next transfer, to test re-entrancy.
+/**
+ * @notice ERC20 that calls `target` with `data` on its next transfer, to test re-entrancy.
+ */
 contract ReentrantERC20 is MockERC20 {
     address internal target;
     bytes internal data;

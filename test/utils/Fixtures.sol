@@ -3,7 +3,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-/// @notice Deploys contracts from the creation bytecode stored in `test/fixtures/<name>.hex`.
+/**
+ * @notice Deploys contracts from the creation bytecode stored in `test/fixtures/<name>.hex`.
+ */
 abstract contract Fixtures is Test {
     function deployFixture(string memory name, bytes memory args) internal returns (address deployed) {
         string memory hexCode = vm.trim(vm.readFile(string.concat("test/fixtures/", name, ".hex")));

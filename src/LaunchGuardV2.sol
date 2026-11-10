@@ -8,36 +8,40 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 
-/// @title LaunchGuardV2
-/// @author Evgeniy Lebedev
-/// @notice Adds the first liquidity to a Uniswap V2 pair at an exact price, even if someone has already sent tokens
-///         to the pair and called `sync()`.
-/// @dev The attack: before the launch anyone can create the pair, send some dust of the quote token to it and call
-///      `sync()`. One reserve becomes non-zero, the other stays zero, and `router.addLiquidity` always reverts in
-///      `quote()`. With dust on both sides the router forces the dust ratio on the whole deposit.
-///
-///      This contract does not use the router. While the pair has no liquidity providers (`totalSupply() == 0`),
-///      `pair.mint()` accepts any ratio, so the contract sends the tokens straight to the pair and mints. Tokens that
-///      are already in the pair are taken into account: the contract adds `extraA` or `extraB` on top of the deposit,
-///      so the final pair balances have the ratio `amountA : amountB`. All tokens in the pair, including the dust,
-///      then belong to the LP tokens of `to` (except the `MINIMUM_LIQUIDITY` locked by the pair).
-///
-///      The contract holds no funds and has no owner. Tokens move from `msg.sender` to the pair in one transaction.
-///      It works with any Uniswap V2 fork that keeps the original `mint()` logic (PancakeSwap, SushiSwap, ...).
+/**
+ * @title LaunchGuardV2
+ * @author Evgeniy Lebedev
+ * @notice Adds the first liquidity to a Uniswap V2 pair at an exact price, even if someone has already sent tokens
+ *         to the pair and called `sync()`.
+ * @dev The attack: before the launch anyone can create the pair, send some dust of the quote token to it and call
+ *      `sync()`. One reserve becomes non-zero, the other stays zero, and `router.addLiquidity` always reverts in
+ *      `quote()`. With dust on both sides the router forces the dust ratio on the whole deposit.
+ *
+ *      This contract does not use the router. While the pair has no liquidity providers (`totalSupply() == 0`),
+ *      `pair.mint()` accepts any ratio, so the contract sends the tokens straight to the pair and mints. Tokens that
+ *      are already in the pair are taken into account: the contract adds `extraA` or `extraB` on top of the deposit,
+ *      so the final pair balances have the ratio `amountA : amountB`. All tokens in the pair, including the dust,
+ *      then belong to the LP tokens of `to` (except the `MINIMUM_LIQUIDITY` locked by the pair).
+ *
+ *      The contract holds no funds and has no owner. Tokens move from `msg.sender` to the pair in one transaction.
+ *      It works with any Uniswap V2 fork that keeps the original `mint()` logic (PancakeSwap, SushiSwap, ...).
+ */
 contract LaunchGuardV2 {
     using SafeERC20 for IERC20;
 
-    /// @notice Parameters of `addInitialLiquidity`.
-    /// @param factory Uniswap V2 factory (or a fork). The pair is created if it does not exist.
-    /// @param tokenA First token of the pair.
-    /// @param tokenB Second token of the pair.
-    /// @param amountA Amount of `tokenA` to deposit. `amountA / amountB` is the launch price.
-    /// @param amountB Amount of `tokenB` to deposit.
-    /// @param maxExtraA Maximum amount of `tokenA` the caller agrees to add on top of `amountA` to balance tokens
-    ///        that are already in the pair.
-    /// @param maxExtraB Maximum amount of `tokenB` the caller agrees to add on top of `amountB`.
-    /// @param to Receiver of the LP tokens.
-    /// @param deadline The transaction reverts after this timestamp.
+    /**
+     * @notice Parameters of `addInitialLiquidity`.
+     * @param factory Uniswap V2 factory (or a fork). The pair is created if it does not exist.
+     * @param tokenA First token of the pair.
+     * @param tokenB Second token of the pair.
+     * @param amountA Amount of `tokenA` to deposit. `amountA / amountB` is the launch price.
+     * @param amountB Amount of `tokenB` to deposit.
+     * @param maxExtraA Maximum amount of `tokenA` the caller agrees to add on top of `amountA` to balance tokens
+     *        that are already in the pair.
+     * @param maxExtraB Maximum amount of `tokenB` the caller agrees to add on top of `amountB`.
+     * @param to Receiver of the LP tokens.
+     * @param deadline The transaction reverts after this timestamp.
+     */
     struct Params {
         IUniswapV2Factory factory;
         address tokenA;
@@ -50,13 +54,6 @@ contract LaunchGuardV2 {
         uint256 deadline;
     }
 
-    /// @notice Emitted when the first liquidity is added to `pair`.
-    /// @param pair The pair that received the liquidity.
-    /// @param sender The account that paid for the deposit.
-    /// @param to Receiver of the LP tokens.
-    /// @param depositA Amount of `tokenA` sent to the pair (`amountA + extraA`).
-    /// @param depositB Amount of `tokenB` sent to the pair (`amountB + extraB`).
-    /// @param liquidity Amount of LP tokens minted to `to`.
     event InitialLiquidityAdded(
         address indexed pair,
         address indexed sender,
@@ -66,23 +63,23 @@ contract LaunchGuardV2 {
         uint256 liquidity
     );
 
-    /// @notice `block.timestamp` is after `deadline`.
     error Expired();
-    /// @notice `amountA` or `amountB` is zero.
     error ZeroAmount();
-    /// @notice `to` is the zero address.
     error ZeroAddress();
-    /// @notice The pair already has liquidity providers. Extra tokens would be shared with them.
     error PairHasLiquidity();
-    /// @notice The tokens already in the pair need more compensation than `maxExtraA` / `maxExtraB` allow.
     error ExtraAboveMax(uint256 extraA, uint256 extraB);
 
-    /// @notice Adds the first liquidity to the `tokenA`/`tokenB` pair so that its price is `amountA / amountB`.
-    /// @dev The caller must approve this contract for `amountA + maxExtraA` of `tokenA` and `amountB + maxExtraB` of
-    ///      `tokenB`. Fee-on-transfer and rebasing tokens are not supported.
-    /// @param params See `Params`.
-    /// @return pair The pair address.
-    /// @return liquidity Amount of LP tokens minted to `params.to`.
+    /**
+     * @notice Adds the first liquidity to the `tokenA`/`tokenB` pair so that its price is `amountA / amountB`.
+     * @dev The caller must approve this contract for `amountA + maxExtraA` of `tokenA` and `amountB + maxExtraB` of
+     *      `tokenB`. Fee-on-transfer and rebasing tokens are not supported.
+     *
+     *      Reverts with `PairHasLiquidity` if the pair already has LP tokens: extra tokens would be shared with their
+     *      holders. Emits `InitialLiquidityAdded` with the amounts actually sent to the pair (`amount + extra`).
+     * @param params See `Params`.
+     * @return pair The pair address.
+     * @return liquidity Amount of LP tokens minted to `params.to`.
+     */
     function addInitialLiquidity(Params calldata params) external returns (address pair, uint256 liquidity) {
         if (block.timestamp > params.deadline) revert Expired();
         if (params.amountA == 0 || params.amountB == 0) revert ZeroAmount();
@@ -104,11 +101,13 @@ contract LaunchGuardV2 {
         emit InitialLiquidityAdded(pair, msg.sender, params.to, depositA, depositB, liquidity);
     }
 
-    /// @notice Returns how much `addInitialLiquidity` would add on top of `amountA` and `amountB` right now.
-    /// @dev The result changes if someone sends tokens to the pair before the transaction. Use it to choose
-    ///      `maxExtraA` / `maxExtraB` with a margin. Returns zeros if the pair does not exist.
-    /// @return extraA Amount of `tokenA` added on top of `amountA`.
-    /// @return extraB Amount of `tokenB` added on top of `amountB`.
+    /**
+     * @notice Returns how much `addInitialLiquidity` would add on top of `amountA` and `amountB` right now.
+     * @dev The result changes if someone sends tokens to the pair before the transaction. Use it to choose
+     *      `maxExtraA` / `maxExtraB` with a margin. Returns zeros if the pair does not exist.
+     * @return extraA Amount of `tokenA` added on top of `amountA`.
+     * @return extraB Amount of `tokenB` added on top of `amountB`.
+     */
     function quoteExtra(IUniswapV2Factory factory, address tokenA, address tokenB, uint256 amountA, uint256 amountB)
         external
         view
@@ -120,11 +119,13 @@ contract LaunchGuardV2 {
         return _extra(pair, tokenA, tokenB, amountA, amountB);
     }
 
-    /// @dev Finds the extra amounts that make the final pair balances proportional to `amountA : amountB`:
-    ///      `(balanceA + amountA + extraA) / (balanceB + amountB + extraB) = amountA / amountB`.
-    ///      Only one side needs extra tokens. It is rounded up, so the final balance of that side is at most 1 wei
-    ///      above the exact value. Pair balances are used instead of reserves, so tokens sent without `sync()`
-    ///      are counted too.
+    /**
+     * @dev Finds the extra amounts that make the final pair balances proportional to `amountA : amountB`:
+     *      `(balanceA + amountA + extraA) / (balanceB + amountB + extraB) = amountA / amountB`.
+     *      Only one side needs extra tokens. It is rounded up, so the final balance of that side is at most 1 wei
+     *      above the exact value. Pair balances are used instead of reserves, so tokens sent without `sync()`
+     *      are counted too.
+     */
     function _extra(address pair, address tokenA, address tokenB, uint256 amountA, uint256 amountB)
         private
         view

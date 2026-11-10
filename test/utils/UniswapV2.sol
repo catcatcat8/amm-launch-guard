@@ -3,14 +3,18 @@ pragma solidity 0.8.28;
 
 import {Fixtures} from "./Fixtures.sol";
 
-/// @notice Full Uniswap V2 factory interface used by the tests.
+/**
+ * @notice Full Uniswap V2 factory interface used by the tests.
+ */
 interface ITestFactory {
     function getPair(address tokenA, address tokenB) external view returns (address pair);
 
     function createPair(address tokenA, address tokenB) external returns (address pair);
 }
 
-/// @notice Full Uniswap V2 pair interface used by the tests.
+/**
+ * @notice Full Uniswap V2 pair interface used by the tests.
+ */
 interface ITestPair {
     function token0() external view returns (address);
 
@@ -31,7 +35,9 @@ interface ITestPair {
     function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external;
 }
 
-/// @notice Uniswap V2 router functions used by the tests.
+/**
+ * @notice Uniswap V2 router functions used by the tests.
+ */
 interface ITestRouter {
     function factory() external view returns (address);
 
@@ -47,14 +53,18 @@ interface ITestRouter {
     ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
 }
 
-/// @notice Deploys the original Uniswap V2 factory and router from `test/fixtures` and adds pair helpers.
+/**
+ * @notice Deploys the original Uniswap V2 factory and router from `test/fixtures` and adds pair helpers.
+ */
 abstract contract UniswapV2Fixture is Fixtures {
     function deployUniswapV2(address weth) internal returns (ITestFactory factory, ITestRouter router) {
         factory = ITestFactory(deployFixture("v2/UniswapV2Factory", abi.encode(address(0))));
         router = ITestRouter(deployFixture("v2/UniswapV2Router02", abi.encode(address(factory), weth)));
     }
 
-    /// @dev Returns the pair reserves in the order of `tokenA`, `tokenB`.
+    /**
+     * @dev Returns the pair reserves in the order of `tokenA`, `tokenB`.
+     */
     function reservesOf(ITestPair pair, address tokenA) internal view returns (uint256 reserveA, uint256 reserveB) {
         (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
         (reserveA, reserveB) = pair.token0() == tokenA ? (reserve0, reserve1) : (reserve1, reserve0);

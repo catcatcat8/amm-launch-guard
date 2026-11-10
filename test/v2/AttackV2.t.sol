@@ -4,7 +4,9 @@ pragma solidity 0.8.28;
 import {BaseV2Test} from "../utils/BaseV2Test.sol";
 import {ITestPair} from "../utils/UniswapV2.sol";
 
-/// @notice Shows the attack on a plain Uniswap V2 launch and why fixing it through the router does not work.
+/**
+ * @notice Shows the attack on a plain Uniswap V2 launch and why fixing it through the router does not work.
+ */
 contract AttackV2Test is BaseV2Test {
     function setUp() public override {
         super.setUp();
@@ -14,7 +16,9 @@ contract AttackV2Test is BaseV2Test {
         vm.stopPrank();
     }
 
-    /// @notice Baseline: without the attack `addLiquidity` creates the pair and sets the target price.
+    /**
+     * @notice Baseline: without the attack `addLiquidity` creates the pair and sets the target price.
+     */
     function test_NormalLaunchWithoutAttack() public {
         vm.prank(team);
         router.addLiquidity(
@@ -26,7 +30,9 @@ contract AttackV2Test is BaseV2Test {
         assertEq(reserveWbnb, AMOUNT_WBNB);
     }
 
-    /// @notice 2 wei of WBNB and `sync()` make every `addLiquidity` call revert.
+    /**
+     * @notice 2 wei of WBNB and `sync()` make every `addLiquidity` call revert.
+     */
     function test_AttackBreaksNormalLaunch() public {
         ITestPair pair = attack(2);
 
@@ -40,7 +46,9 @@ contract AttackV2Test is BaseV2Test {
         router.addLiquidity(address(newToken), address(wbnb), AMOUNT_NEW, AMOUNT_WBNB, 0, 0, team, block.timestamp);
     }
 
-    /// @notice If the attacker has a little NEW, dust on both sides makes the router use the attacker's price.
+    /**
+     * @notice If the attacker has a little NEW, dust on both sides makes the router use the attacker's price.
+     */
     function test_DustOnBothSidesForcesAttackerPrice() public {
         vm.prank(team);
         newToken.transfer(attacker, 1);
@@ -61,8 +69,10 @@ contract AttackV2Test is BaseV2Test {
         assertEq(usedWbnb, AMOUNT_WBNB);
     }
 
-    /// @notice Topping up the dust and calling the router does not give the target price: the router fits the whole
-    ///         deposit to the ratio of the dust, and the dust ratio can only be set in whole wei.
+    /**
+     * @notice Topping up the dust and calling the router does not give the target price: the router fits the whole
+     *         deposit to the ratio of the dust, and the dust ratio can only be set in whole wei.
+     */
     function test_RouterCopiesRoundedDustRatio() public {
         ITestPair pair = attack(2);
 
@@ -83,8 +93,10 @@ contract AttackV2Test is BaseV2Test {
         assertApproxEqRel(reserveWbnb * 1e18 / reserveNew, 0.3333e18, 0.001e18);
     }
 
-    /// @notice If the dust is fixed in one transaction and liquidity is added in another, the attacker can move the
-    ///         price of the dust pool again for almost nothing.
+    /**
+     * @notice If the dust is fixed in one transaction and liquidity is added in another, the attacker can move the
+     *         price of the dust pool again for almost nothing.
+     */
     function test_FixInSeparateTransactionIsGriefedAgain() public {
         ITestPair pair = attack(2);
 

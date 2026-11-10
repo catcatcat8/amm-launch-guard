@@ -17,6 +17,8 @@ fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 
 [fmt]
 line_length = 120
+# NatSpec as /** */ blocks.
+docs_style = "block"
 
 [lint]
 lint_on_build = false

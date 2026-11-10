@@ -7,7 +7,9 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import {ITestFactory, ITestPair, ITestRouter} from "../utils/UniswapV2.sol";
 import {BscForkTest} from "./BscForkTest.sol";
 
-/// @notice The attack and the fix on the real PancakeSwap V2 deployment on BNB Smart Chain.
+/**
+ * @notice The attack and the fix on the real PancakeSwap V2 deployment on BNB Smart Chain.
+ */
 contract LaunchGuardV2ForkTest is BscForkTest {
     ITestFactory internal constant PANCAKE_FACTORY = ITestFactory(0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73);
     ITestRouter internal constant PANCAKE_ROUTER = ITestRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);

@@ -26,7 +26,9 @@ contract LaunchGuardV2Test is BaseV2Test {
     // Launch
     // ---------------------------------------------------------------------------------------------------------------
 
-    /// @notice After the attack the guard launches the pair at the target price.
+    /**
+     * @notice After the attack the guard launches the pair at the target price.
+     */
     function test_GuardRestoresTargetPrice() public {
         ITestPair pair = attack(2);
 
@@ -58,7 +60,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         _assertNoBalances();
     }
 
-    /// @notice Without the attack the guard creates the pair and adds the exact amounts.
+    /**
+     * @notice Without the attack the guard creates the pair and adds the exact amounts.
+     */
     function test_CreatesPairIfMissing() public {
         assertEq(address(pairOf()), address(0));
 
@@ -70,7 +74,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         assertEq(reserveWbnb, AMOUNT_WBNB);
     }
 
-    /// @notice A pair that was created in advance but is empty needs no extra tokens.
+    /**
+     * @notice A pair that was created in advance but is empty needs no extra tokens.
+     */
     function test_EmptyPairCreatedInAdvance() public {
         vm.prank(attacker);
         factory.createPair(address(newToken), address(wbnb));
@@ -85,7 +91,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         assertEq(reserveWbnb, AMOUNT_WBNB);
     }
 
-    /// @notice Dust on both sides at the attacker's 1:1 ratio is balanced to the target ratio.
+    /**
+     * @notice Dust on both sides at the attacker's 1:1 ratio is balanced to the target ratio.
+     */
     function test_DustOnBothSides() public {
         vm.prank(team);
         newToken.transfer(attacker, 1);
@@ -101,7 +109,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         _assertTargetPrice(pair, AMOUNT_NEW, AMOUNT_WBNB);
     }
 
-    /// @notice Tokens sent to the pair without `sync()` are counted too, because the guard reads balances.
+    /**
+     * @notice Tokens sent to the pair without `sync()` are counted too, because the guard reads balances.
+     */
     function test_CountsTokensSentWithoutSync() public {
         vm.startPrank(attacker);
         ITestPair pair = ITestPair(factory.createPair(address(newToken), address(wbnb)));
@@ -116,7 +126,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         _assertTargetPrice(pair, AMOUNT_NEW, AMOUNT_WBNB);
     }
 
-    /// @notice The token order in the call does not matter.
+    /**
+     * @notice The token order in the call does not matter.
+     */
     function test_ReversedTokenOrder() public {
         ITestPair pair = attack(2);
 
@@ -133,7 +145,9 @@ contract LaunchGuardV2Test is BaseV2Test {
     // Front-running
     // ---------------------------------------------------------------------------------------------------------------
 
-    /// @notice A front-run donation within `maxExtra` does not change the price. The donation goes to the team.
+    /**
+     * @notice A front-run donation within `maxExtra` does not change the price. The donation goes to the team.
+     */
     function test_FrontRunDonationGoesToTheTeam() public {
         ITestPair pair = attack(2);
 
@@ -161,7 +175,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         assertGt(newToken.balanceOf(team), teamNewBefore - 1e9);
     }
 
-    /// @notice A front-run that needs more extra tokens than the caller allowed makes the call revert.
+    /**
+     * @notice A front-run that needs more extra tokens than the caller allowed makes the call revert.
+     */
     function test_RevertWhen_ExtraAboveMax() public {
         ITestPair pair = attack(2);
 
@@ -178,7 +194,9 @@ contract LaunchGuardV2Test is BaseV2Test {
         _launch(params);
     }
 
-    /// @notice If someone already provided liquidity, extra tokens would go to them. the guard reverts.
+    /**
+     * @notice If someone already provided liquidity, extra tokens would go to them. the guard reverts.
+     */
     function test_RevertWhen_PairHasLiquidity() public {
         _launch(_params());
 
@@ -231,8 +249,10 @@ contract LaunchGuardV2Test is BaseV2Test {
     // Fuzz
     // ---------------------------------------------------------------------------------------------------------------
 
-    /// @notice For any target price and any tokens already in the pair (synced or not), the final pair balances
-    ///         match the target ratio up to 1 wei.
+    /**
+     * @notice For any target price and any tokens already in the pair (synced or not), the final pair balances
+     *         match the target ratio up to 1 wei.
+     */
     function testFuzz_FinalPriceMatchesTarget(
         uint256 amountNew,
         uint256 amountWbnb,
@@ -304,14 +324,18 @@ contract LaunchGuardV2Test is BaseV2Test {
         return guard.quoteExtra(_factory(), address(newToken), address(wbnb), AMOUNT_NEW, AMOUNT_WBNB);
     }
 
-    /// @dev LP minted for the first deposit: sqrt(deposit0 * deposit1) - MINIMUM_LIQUIDITY. Only the attack dust
-    ///      (2 wei of WBNB, already in the reserves) is excluded from the deposit.
+    /**
+     * @dev LP minted for the first deposit: sqrt(deposit0 * deposit1) - MINIMUM_LIQUIDITY. Only the attack dust
+     *      (2 wei of WBNB, already in the reserves) is excluded from the deposit.
+     */
     function _expectedLiquidity(uint256 extraNew, uint256 extraWbnb) internal pure returns (uint256) {
         return _sqrt((AMOUNT_NEW + extraNew) * (AMOUNT_WBNB + extraWbnb)) - MINIMUM_LIQUIDITY;
     }
 
-    /// @dev The side that got extra tokens is the smallest whole amount at or above the exact target:
-    ///      `reserveWbnb = ceil(reserveNew * amountWbnb / amountNew)` or the same with the sides swapped.
+    /**
+     * @dev The side that got extra tokens is the smallest whole amount at or above the exact target:
+     *      `reserveWbnb = ceil(reserveNew * amountWbnb / amountNew)` or the same with the sides swapped.
+     */
     function _assertTargetPrice(ITestPair pair, uint256 amountNew, uint256 amountWbnb) internal view {
         (uint256 reserveNew, uint256 reserveWbnb) = reserves(pair);
         if (reserveWbnb * amountNew >= reserveNew * amountWbnb) {
