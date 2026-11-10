@@ -8,12 +8,12 @@ import {LaunchGuardV3} from "../../src/LaunchGuardV3.sol";
  *         `amount` of `token` with no limit.
  */
 contract FakeV3Pool {
-    address internal immutable token;
-    uint256 internal immutable amount;
+    address internal immutable TOKEN;
+    uint256 internal immutable AMOUNT;
 
     constructor(address token_, uint256 amount_) {
-        token = token_;
-        amount = amount_;
+        TOKEN = token_;
+        AMOUNT = amount_;
     }
 
     function slot0() external pure returns (uint160, int24) {
@@ -21,9 +21,9 @@ contract FakeV3Pool {
     }
 
     function swap(address, bool, int256, uint160, bytes calldata) external returns (int256, int256) {
-        bytes memory data = abi.encode(token, token, type(uint256).max, type(uint256).max);
-        LaunchGuardV3(msg.sender).uniswapV3SwapCallback(int256(amount), 0, data);
-        return (int256(amount), 0);
+        bytes memory data = abi.encode(TOKEN, TOKEN, type(uint256).max, type(uint256).max);
+        LaunchGuardV3(msg.sender).uniswapV3SwapCallback(int256(AMOUNT), 0, data);
+        return (int256(AMOUNT), 0);
     }
 }
 
@@ -31,14 +31,14 @@ contract FakeV3Pool {
  * @notice A malicious position manager that returns `FakeV3Pool` as the pool.
  */
 contract FakePositionManager {
-    address internal immutable pool;
+    address internal immutable POOL;
 
     constructor(address pool_) {
-        pool = pool_;
+        POOL = pool_;
     }
 
     function createAndInitializePoolIfNecessary(address, address, uint24, uint160) external view returns (address) {
-        return pool;
+        return POOL;
     }
 }
 

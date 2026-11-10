@@ -167,6 +167,7 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
             // A real pool always calls the callback, and the callback always reverts here.
             revert QuoteFailed();
         } catch (bytes memory reason) {
+            // forge-lint: disable-next-line(unsafe-typecast) - the length is checked first.
             if (reason.length != 68 || bytes4(reason) != QuoteResult.selector) {
                 assembly {
                     revert(add(reason, 32), mload(reason))
@@ -231,7 +232,10 @@ contract LaunchGuardV3 is ReentrancyGuardTransient {
         (address token0, address token1, uint256 maxSwapIn0, uint256 maxSwapIn1) =
             abi.decode(data, (address, address, uint256, uint256));
 
+        // The deltas are cast only when they are positive.
+        // forge-lint: disable-next-line(unsafe-typecast)
         if (amount0Delta > 0) _pay(token0, uint256(amount0Delta), maxSwapIn0);
+        // forge-lint: disable-next-line(unsafe-typecast)
         if (amount1Delta > 0) _pay(token1, uint256(amount1Delta), maxSwapIn1);
     }
 

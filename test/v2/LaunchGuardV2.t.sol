@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {LaunchGuardV2} from "../../src/LaunchGuardV2.sol";
 import {IUniswapV2Factory} from "../../src/interfaces/IUniswapV2Factory.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 import {BaseV2Test} from "../utils/BaseV2Test.sol";
 import {ITestPair} from "../utils/UniswapV2.sol";
 

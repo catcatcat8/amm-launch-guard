@@ -14,9 +14,9 @@ import {BscForkTest} from "./BscForkTest.sol";
  * @notice The attack and the fix on the real PancakeSwap V3 deployment on BNB Smart Chain.
  */
 contract LaunchGuardV3ForkTest is BscForkTest {
-    ITestPositionManager internal constant PANCAKE_POSITION_MANAGER =
+    ITestPositionManager internal constant POSITION_MANAGER =
         ITestPositionManager(0x46A15B0b27311cedF172AB29E4f4766fbE7F4364);
-    ITestV3Factory internal constant PANCAKE_V3_FACTORY = ITestV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
+    ITestV3Factory internal constant V3_FACTORY = ITestV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
 
     /**
      * @dev The 0.25% fee tier and its widest range (tick spacing 50).
@@ -45,7 +45,7 @@ contract LaunchGuardV3ForkTest is BscForkTest {
     function setUp() public {
         if (!selectBscFork()) return;
 
-        assertEq(PANCAKE_POSITION_MANAGER.factory(), address(PANCAKE_V3_FACTORY));
+        assertEq(POSITION_MANAGER.factory(), address(V3_FACTORY));
 
         guard = new LaunchGuardV3();
         newToken = new MockERC20("New Token", "NEW");
@@ -60,14 +60,14 @@ contract LaunchGuardV3ForkTest is BscForkTest {
 
         // The attack: create the pool and initialize it at a wrong price.
         vm.startPrank(attacker);
-        pool = PANCAKE_V3_FACTORY.createPool(token0, token1, FEE);
+        pool = V3_FACTORY.createPool(token0, token1, FEE);
         ITestV3Pool(pool).initialize(ATTACKER_PRICE);
         vm.stopPrank();
     }
 
     function test_Fork_AttackKeepsWrongPrice() public {
         vm.prank(team);
-        address returned = PANCAKE_POSITION_MANAGER.createAndInitializePoolIfNecessary(token0, token1, FEE, targetPrice);
+        address returned = POSITION_MANAGER.createAndInitializePoolIfNecessary(token0, token1, FEE, targetPrice);
 
         assertEq(returned, pool);
         assertEq(_price(), ATTACKER_PRICE);
@@ -84,7 +84,7 @@ contract LaunchGuardV3ForkTest is BscForkTest {
         WBNB.approve(address(guard), type(uint256).max);
         (address launched, uint256 tokenId,, uint256 used0, uint256 used1) = guard.addInitialLiquidity(
             LaunchGuardV3.Params({
-                positionManager: INonfungiblePositionManager(address(PANCAKE_POSITION_MANAGER)),
+                positionManager: INonfungiblePositionManager(address(POSITION_MANAGER)),
                 token0: token0,
                 token1: token1,
                 fee: FEE,
@@ -105,7 +105,7 @@ contract LaunchGuardV3ForkTest is BscForkTest {
 
         assertEq(launched, pool);
         assertEq(_price(), targetPrice);
-        assertEq(PANCAKE_POSITION_MANAGER.ownerOf(tokenId), team);
+        assertEq(POSITION_MANAGER.ownerOf(tokenId), team);
         assertApproxEqRel(used0, amount0, 1e12);
         assertApproxEqRel(used1, amount1, 1e12);
     }
