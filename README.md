@@ -179,7 +179,7 @@ Both contracts:
 
 ## Getting started
 
-Requirements: [Foundry](https://book.getfoundry.sh/getting-started/installation).
+Requirements: [Foundry](https://book.getfoundry.sh/getting-started/installation) v1.9.0 (the version used in CI; install it with `foundryup -i v1.9.0`).
 
 ```bash
 git clone --recursive https://github.com/catcatcat8/amm-launch-guard.git
