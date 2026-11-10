@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Fixtures} from "./Fixtures.sol";
 
 /// @notice Full Uniswap V2 factory interface used by the tests.
 interface ITestFactory {
@@ -48,24 +48,15 @@ interface ITestRouter {
 }
 
 /// @notice Deploys the original Uniswap V2 factory and router from `test/fixtures` and adds pair helpers.
-abstract contract UniswapV2Fixture is Test {
+abstract contract UniswapV2Fixture is Fixtures {
     function deployUniswapV2(address weth) internal returns (ITestFactory factory, ITestRouter router) {
-        factory = ITestFactory(_deployFixture("UniswapV2Factory", abi.encode(address(0))));
-        router = ITestRouter(_deployFixture("UniswapV2Router02", abi.encode(address(factory), weth)));
+        factory = ITestFactory(deployFixture("v2/UniswapV2Factory", abi.encode(address(0))));
+        router = ITestRouter(deployFixture("v2/UniswapV2Router02", abi.encode(address(factory), weth)));
     }
 
     /// @dev Returns the pair reserves in the order of `tokenA`, `tokenB`.
     function reservesOf(ITestPair pair, address tokenA) internal view returns (uint256 reserveA, uint256 reserveB) {
         (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
         (reserveA, reserveB) = pair.token0() == tokenA ? (reserve0, reserve1) : (reserve1, reserve0);
-    }
-
-    function _deployFixture(string memory name, bytes memory args) private returns (address deployed) {
-        string memory hexCode = vm.trim(vm.readFile(string.concat("test/fixtures/v2/", name, ".hex")));
-        bytes memory initCode = abi.encodePacked(vm.parseBytes(hexCode), args);
-        assembly {
-            deployed := create(0, add(initCode, 0x20), mload(initCode))
-        }
-        require(deployed != address(0), string.concat("failed to deploy ", name));
     }
 }
