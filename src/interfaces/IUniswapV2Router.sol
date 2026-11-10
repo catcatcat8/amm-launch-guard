@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity ^0.8.20;
 
-/**
- * @title IPancakeRouter
- * @author gotbit
- * @dev Required the PancakeRouter contract interface
- */
-interface IPancakeRouter {
-    function factory() external pure returns (address);
-
-    function WETH() external pure returns (address);
+/// @notice Minimal Uniswap V2 router interface. Works with any V2 fork (PancakeSwap, SushiSwap, ...).
+interface IUniswapV2Router {
+    function factory() external view returns (address);
 
     function addLiquidity(
         address tokenA,

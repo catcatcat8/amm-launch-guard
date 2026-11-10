@@ -1,12 +1,7 @@
-node_modules
+# Foundry
+out/
+cache/
+broadcast/*/31337/
+
+# Environment
 .env
-coverage
-coverage.json
-cache
-artifacts
-.secrets.ts
-.secrets.json
-../
-*/**/.DS_Store
-cache_forge
-out
