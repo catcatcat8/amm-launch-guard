@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {LaunchGuardV2} from "../../src/LaunchGuardV2.sol";
 import {IUniswapV2Factory} from "../../src/interfaces/IUniswapV2Factory.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {ITestFactory, ITestPair, ITestRouter} from "../utils/UniswapV2.sol";
+import {BscForkTest} from "./BscForkTest.sol";
 
 /// @notice The attack and the fix on the real PancakeSwap V2 deployment on BNB Smart Chain.
-/// @dev Needs `BSC_RPC_URL`; without it the tests are skipped. `BSC_FORK_BLOCK` pins the block (needs an archive
-///      node); by default the latest block is used.
-contract LaunchGuardV2ForkTest is Test {
+contract LaunchGuardV2ForkTest is BscForkTest {
     ITestFactory internal constant PANCAKE_FACTORY = ITestFactory(0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73);
     ITestRouter internal constant PANCAKE_ROUTER = ITestRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    IERC20 internal constant WBNB = IERC20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
 
     uint256 internal constant AMOUNT_NEW = 1_000_000e18;
     uint256 internal constant AMOUNT_WBNB = 37e18; // 1 NEW = 0.000037 WBNB
@@ -24,18 +19,8 @@ contract LaunchGuardV2ForkTest is Test {
     MockERC20 internal newToken;
     ITestPair internal pair;
 
-    address internal team = makeAddr("team");
-    address internal attacker = makeAddr("attacker");
-
     function setUp() public {
-        string memory rpcUrl = vm.envOr("BSC_RPC_URL", string(""));
-        if (bytes(rpcUrl).length == 0) {
-            vm.skip(true, "BSC_RPC_URL is not set");
-            return;
-        }
-        uint256 forkBlock = vm.envOr("BSC_FORK_BLOCK", uint256(0));
-        if (forkBlock == 0) vm.createSelectFork(rpcUrl);
-        else vm.createSelectFork(rpcUrl, forkBlock);
+        if (!selectBscFork()) return;
 
         assertEq(PANCAKE_ROUTER.factory(), address(PANCAKE_FACTORY));
 
