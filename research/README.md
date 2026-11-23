@@ -59,12 +59,13 @@ The full list, with every month, comes from `python3 research/analyze.py`. Every
 
 ## Reproduce
 
-Requirements: Foundry and Python 3 (standard library only). From the repository root:
+Requirements: Foundry and Python 3 (standard library only; the chart also needs matplotlib). From the repository root:
 
 ```bash
 python3 research/scan.py scan <BSC_RPC_URL>   # about an hour; writes research/data/scan.jsonl
 python3 research/scan.py export               # writes data/blocked-pairs.csv and data/totals.json
 python3 research/analyze.py                   # prints the statistics above
+python3 research/chart.py [out.png]           # bar chart by month; needs matplotlib
 ```
 
 `scan` takes optional `from` and `to` pair indexes to scan a range. A new scan sees the chain at a later time, so the numbers will differ.
