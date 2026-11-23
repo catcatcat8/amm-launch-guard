@@ -31,11 +31,13 @@ amounts = collections.Counter()
 tokens = collections.Counter()
 months = collections.Counter()
 last_7 = last_30 = 0
+one_wei_quote = 0
 for r in one_sided:
     filled, blocked = ("token1", "token0") if r["reserve0"] == "0" else ("token0", "token1")
     amount = int(r["reserve1"] if r["reserve0"] == "0" else r["reserve0"])
     quote_side[QUOTES.get(r[filled], "other")] += 1
     amounts["1 wei" if amount == 1 else "2-1000 wei" if amount <= 1000 else "more than 1000 wei"] += 1
+    one_wei_quote += amount == 1 and QUOTES.get(r[filled]) in ("WBNB", "USDT")
     tokens[r[blocked]] += 1
     synced = datetime.datetime.fromtimestamp(int(r["timestamp"]), datetime.timezone.utc)
     months[synced.strftime("%Y-%m")] += 1
@@ -53,6 +55,7 @@ print()
 print("One reserve > 0:")
 print("  filled side:     ", ", ".join(f"{k} {v:,}" for k, v in quote_side.most_common()))
 print("  amount:          ", ", ".join(f"{k} {v:,}" for k, v in amounts.most_common()))
+print(f"  exactly 1 wei of WBNB or USDT: {one_wei_quote:,} ({one_wei_quote / len(one_sided):.1%})")
 print(f"  distinct tokens:  {len(tokens):,} ({sum(1 for v in tokens.values() if v > 1):,} with 2+ blocked pairs)")
 print(f"  last sync() in the last 7 days: {last_7:,}, in the last 30 days: {last_30:,}")
 print()
