@@ -48,6 +48,7 @@ The full list, with every month, comes from `python3 research/analyze.py`. Every
 ## How to read the numbers
 
 - **A lower bound.** The scan sees only pairs that are still blocked. A pair that was attacked and launched later has LP tokens and is not counted.
+- **Emptied pairs are not counted.** The first `mint` of a pair locks `MINIMUM_LIQUIDITY` (1000 LP tokens) on the zero address forever, so a pair that ever had liquidity never returns to `totalSupply() == 0`. A pair whose LPs withdrew everything and left some dust is in the "with LP tokens" group. With no LP tokens, the reserves can become non-zero only through a transfer to the pair followed by `sync()`.
 - **The timestamp** is `blockTimestampLast` of the pair, the time of its last `sync()`. For a pair in this state it is the time of the attack.
 - **Not the same as failed launches.** Many of these tokens may have launched in another pair or on another DEX. The data shows that the PancakeSwap V2 pair is blocked, not what happened to the token.
 - **Intent is not proven.** 88% of the pairs hold exactly 1 wei of WBNB or USDT, and hundreds of tokens have both their WBNB and USDT pairs blocked. This looks automated, but the data does not show who sent the tokens or why.
