@@ -1,6 +1,6 @@
 # How common is the `sync()` attack?
 
-A scan of every PancakeSwap V2 pair on BNB Smart Chain for the state that the [`sync()` attack](../README.md#uniswap-v2-the-sync-attack) leaves behind: a pair with **no LP tokens** and **exactly one non-zero reserve**. In this state `router.addLiquidity` always reverts, so the pair cannot be launched through the router.
+A scan of every PancakeSwap V2 pair on BNB Smart Chain for the state that the [`sync()` attack](../README.md#uniswap-v2-the-sync-attack) leaves behind: a pair with **no LP tokens** and **exactly one non-zero reserve**. In this state `router.addLiquidity` always reverts, so the pair cannot be launched through the router. The attack itself is a known griefing vector; the scan measures how often it happens.
 
 ## Results
 

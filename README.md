@@ -7,7 +7,7 @@ Launch a token on Uniswap V2 / V3 or PancakeSwap at the exact price you chose, e
 
 ## Overview
 
-Anyone can create the pool of a token before the token launches. An attacker can use this to block the launch or force a wrong starting price. On Uniswap V2 a few wei and `sync()` are enough. On Uniswap V3 the attacker initializes the pool at a wrong price. This repository has two contracts that still launch the pool at the exact target price, in one transaction:
+Anyone can create the pool of a token before the token launches. This is a known griefing vector: an attacker can use it to block the launch or force a wrong starting price. On Uniswap V2 a few wei and `sync()` are enough. On Uniswap V3 the attacker initializes the pool at a wrong price. This repository measures how common the V2 attack is on PancakeSwap and provides two tested contracts that still launch the pool at the exact target price, in one transaction:
 
 | Contract | DEX | Attack |
 |---|---|---|
@@ -30,10 +30,13 @@ A Uniswap V2 pair keeps two reserves, and the price is their ratio. `sync()` is 
 2. The attacker calls `factory.createPair(NEW, WBNB)`, sends 2 wei of WBNB to the pair and calls `sync()`. The reserves become **0 NEW / 2 wei WBNB**.
 3. The team calls `router.addLiquidity`. The pair is not empty, so the router fits the deposit to the current reserve ratio. To do that it calls `quote()`, which requires both reserves to be non-zero, and the transaction reverts with `INSUFFICIENT_LIQUIDITY`.
 
-The attack costs 2 wei plus gas. Two obvious fixes do not work. Both are reproduced in [`test/v2/AttackV2.t.sol`](test/v2/AttackV2.t.sol):
+The attack costs 2 wei plus gas. It can be fixed by hand, but only one way works, and it needs a contract. All three ways are reproduced in [`test/v2/AttackV2.t.sol`](test/v2/AttackV2.t.sol):
 
-- **Top up the dust and then call the router.** To match 2 wei of WBNB at 0.37 the team would need 5.4 wei of NEW, but only whole wei are possible. With 6 wei the dust ratio is 3:1 instead of 2.7:1. The router then fits the *whole* deposit to the dust ratio and launches the token at 0.333 WBNB, about 10% lower.
-- **Fix the dust in one transaction and add liquidity in the next.** Between the two transactions the pool holds only dust. In the test, a swap of 1000 wei of WBNB moves its price about 3000 times, and `addLiquidity` either reverts on slippage limits or adds liquidity at the attacker's price.
+- **Top up only the dust, then call the router: wrong price.** To match 2 wei of WBNB at 0.37 the team would need 5.4 wei of NEW, but only whole wei are possible. With 6 wei the dust ratio is 3:1 instead of 2.7:1. The router then fits the *whole* deposit to the dust ratio and launches the token at 0.333 WBNB, about 10% lower.
+- **Fix the pair in one transaction and add liquidity in the next: unsafe.** Between the two transactions anyone can act on the pair. If it holds only dust, a swap of 1000 wei of WBNB moves its price about 3000 times, and `addLiquidity` either reverts on slippage limits or adds liquidity at the attacker's price. If the team has already sent real amounts and called `sync()`, the pair has reserves but no LP tokens, so whoever mints first owns them. In the test the attacker takes more than 99% of what the team sent.
+- **Send large amounts of both tokens at the target ratio and add liquidity in the same transaction: works.** The dust is negligible next to the reserves, so the price is exact up to rounding, and the team owns all the liquidity. An account cannot make several calls atomically, so this needs a contract.
+
+`LaunchGuardV2` is a tested version of that contract. It sends the whole deposit to the pair and calls `mint()` directly instead of going through the router, and it adds checks: the pair must have no LP tokens, tokens sent without `sync()` are counted, a front-run is bounded by `maxExtraA` / `maxExtraB`, and the call has a deadline.
 
 ### How LaunchGuardV2 works
 
@@ -195,13 +198,15 @@ forge test
 Example output (shortened):
 
 ```text
-Ran 5 tests for test/v2/AttackV2.t.sol:AttackV2Test
+Ran 7 tests for test/v2/AttackV2.t.sol:AttackV2Test
 [PASS] test_AttackBreaksNormalLaunch()
 [PASS] test_DustOnBothSidesForcesAttackerPrice()
 [PASS] test_FixInSeparateTransactionIsGriefedAgain()
+[PASS] test_FullAmountsInOneTransactionGiveExactPrice()
+[PASS] test_FullAmountsSplitAcrossTransactionsAreStolen()
 [PASS] test_NormalLaunchWithoutAttack()
 [PASS] test_RouterCopiesRoundedDustRatio()
-Suite result: ok. 5 passed; 0 failed; 0 skipped
+Suite result: ok. 7 passed; 0 failed; 0 skipped
 
 Ran 3 tests for test/v3/AttackV3.t.sol:AttackV3Test
 [PASS] test_AttackKeepsWrongPrice()
@@ -209,7 +214,7 @@ Ran 3 tests for test/v3/AttackV3.t.sol:AttackV3Test
 [PASS] test_NormalLaunchWithoutAttack()
 Suite result: ok. 3 passed; 0 failed; 0 skipped
 
-Ran 6 test suites: 44 tests passed, 0 failed, 2 skipped (46 total tests)
+Ran 6 test suites: 46 tests passed, 0 failed, 2 skipped (48 total tests)
 ```
 
 The two skipped suites are the fork tests. Coverage (`forge coverage`): 100% lines, statements, branches and functions for both `src/LaunchGuardV2.sol` and `src/LaunchGuardV3.sol`.
