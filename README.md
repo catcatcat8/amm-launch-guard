@@ -7,7 +7,7 @@ Launch a token on Uniswap V2 / V3 or PancakeSwap at the exact price you chose, e
 
 ## Overview
 
-Anyone can create the pool of a token before the token launches. This is a known griefing vector: an attacker can use it to block the launch or force a wrong starting price. On Uniswap V2 a few wei and `sync()` are enough. On Uniswap V3 the attacker initializes the pool at a wrong price. This repository measures how common the V2 attack is on PancakeSwap and provides two tested contracts that still launch the pool at the exact target price, in one transaction:
+Anyone can create the pool of a token before the token launches. This is a known griefing vector: an attacker can use it to block the launch or force a wrong starting price. On Uniswap V2 a few wei and `sync()` are enough. On Uniswap V3 the attacker initializes the pool at a wrong price. The same applies to bonding-curve launchpads that move liquidity to a DEX when a token graduates: a pair blocked in advance breaks the migration. This repository measures how common the V2 attack is on PancakeSwap and provides two tested contracts that still launch the pool at the exact target price, in one transaction:
 
 | Contract | DEX | Attack |
 |---|---|---|
@@ -101,7 +101,7 @@ Errors: `Expired`, `ZeroAmount`, `ZeroAddress`, `PairHasLiquidity`, `ExtraAboveM
 
 ## Uniswap V3: the initialization attack
 
-A V3 pool stores its price as a separate value, `sqrtPriceX96`. Anyone can create a pool with `factory.createPool` and set its starting price with `pool.initialize`. `initialize` can be called only once.
+A V3 pool stores its price as a separate value, `sqrtPriceX96`. Anyone can create a pool with `factory.createPool` and set its starting price with `pool.initialize`. `initialize` can be called only once. The attack is not theoretical: in February 2025 it drained about $183k from Four.meme token migrations to PancakeSwap V3 ([Verichains analysis](https://blog.verichains.io/p/fourmeme-hack-analysis)).
 
 1. The attacker creates the NEW/WBNB pool and initializes it at 1 NEW = 1,000,000 WBNB.
 2. The team calls `positionManager.createAndInitializePoolIfNecessary(..., targetPrice)`. The pool is already initialized, so the call does nothing.
