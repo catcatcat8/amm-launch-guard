@@ -16,6 +16,14 @@ Anyone can create the pool of a token before the token launches. This is a known
 
 Both contracts have no owner and keep no tokens between calls. One deployment per chain serves any number of launches. Each attack is reproduced in a test against the original Uniswap bytecode and on a BNB Smart Chain fork.
 
+### Deployments
+
+| Network | LaunchGuardV2 | LaunchGuardV3 | Commit |
+|---|---|---|---|
+| BNB Smart Chain | [`0x307E9b2ae24823414Ab23aC88B59125d4DB9fDc7`](https://bscscan.com/address/0x307E9b2ae24823414Ab23aC88B59125d4DB9fDc7#code) | [`0xF6D8C6e48d94ec5709D573aA39E77a5Ea1B026c8`](https://bscscan.com/address/0xF6D8C6e48d94ec5709D573aA39E77a5Ea1B026c8#code) | [`9f1bd76`](https://github.com/catcatcat8/amm-launch-guard/tree/9f1bd76) |
+
+Both are verified on BscScan and Sourcify. The deployment transactions are in [`broadcast/Deploy.s.sol/56/run-latest.json`](broadcast/Deploy.s.sol/56/run-latest.json).
+
 ## How common is it
 
 A scan of all 3,671,255 PancakeSwap V2 pairs (November 2026) found **11,991 pairs** with no LP tokens and exactly one non-zero reserve: the state the V2 attack leaves behind, in which `router.addLiquidity` always reverts. In 88% of them the filled side holds exactly 1 wei of WBNB or USDT. 462 of these pairs were blocked in the 30 days before the scan. Method, data and caveats: [`research/`](research/README.md).
